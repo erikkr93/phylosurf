@@ -6,6 +6,10 @@ Uri buildGoogleSearchUri(String scientificName) {
   return Uri.https('www.google.com', '/search', {'q': scientificName.trim()});
 }
 
+Uri buildNcbiTaxonomyUri(int taxId) {
+  return Uri.https('www.ncbi.nlm.nih.gov', '/datasets/taxonomy/$taxId/');
+}
+
 String buildGeminiSummaryPrompt(TaxonNode taxon) {
   final rankPart = taxon.rank != 'no rank' ? '${taxon.rank} ' : '';
   return 'Summarize the main facts about the ${rankPart}taxon '

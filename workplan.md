@@ -1,8 +1,8 @@
 # PhyloSurf — Project Workplan
 
-**Last updated:** 2026-11-26  
-**Current version:** `1.0.0+1`  
-**Platforms:** Windows (desktop, packaged), Android (release APK built), macOS (configured, ready to build on macOS/CI)
+**Last updated:** 2026-11-27  
+**Current version:** `1.1.0+2`  
+**Platforms:** Windows (desktop, packaged), Android (APK built), macOS (configured, built via CI)
 
 ---
 
@@ -34,8 +34,13 @@
   - Browser-style Back / Forward navigation history.
   - Adaptive layout for desktop split-pane and compact/mobile tabbed views, with Material 3 light/dark system theming.
 - [x] **External Research Links** ([external_links.dart](lib/utils/external_links.dart))
-  - One-click Google Search for the selected taxon's scientific name.
-  - Pre-formatted Gemini summary prompt handoff with taxon rank, scientific name, and NCBI TaxID.
+  - One-click **NCBI Taxonomy** (`datasets/taxonomy/<taxId>`) link for any taxon or search result.
+  - One-click **Google Search** for the selected taxon's scientific name.
+  - Pre-formatted **Gemini** summary prompt handoff with taxon rank, scientific name, and NCBI TaxID.
+- [x] **Offline Neural Scientific-Name Pronunciation (v1.1.0)** ([kitten_taxon_speech_service.dart](lib/services/kitten_taxon_speech_service.dart), [taxon_ipa_phonemizer.dart](lib/utils/taxon_ipa_phonemizer.dart), [kitten_model_manager.dart](lib/services/kitten_model_manager.dart))
+  - Speaker icon next to each taxon's scientific name with progress ring and stop toggle.
+  - On-demand download and atomic extraction of `kitten-nano-en-v0_2-fp16` (~25 MB) via `sherpa_onnx`, persistent background synthesis isolate, in-memory WAV LRU cache, and `flutter_tts` fallback.
+  - Custom Anglicized scientific Latin/Greek IPA phonemizer for zero-OOV coverage across NCBI taxa.
 
 ### Phase 4: Branding, Testing & Windows Distribution
 - [x] **App Branding**: Renamed app and executable to **PhyloSurf** with custom app icon (`assets/icon/phylosurf_icon.png`, `windows/runner/resources/app_icon.ico`).
@@ -68,4 +73,4 @@
 - [ ] **User Quality-of-Life Features**:
   - Bookmarks / pinned taxa persisted locally.
   - Export selected subtree or lineage (CSV / JSON / Newick).
-  - Direct links to NCBI Taxonomy Browser / Wikipedia / GBIF in the inspector.
+  - Direct links to Wikipedia / GBIF in the inspector *(NCBI Taxonomy direct link completed in v1.1.0)*.

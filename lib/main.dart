@@ -1,9 +1,12 @@
+import 'dart:async';
 import 'dart:math' as math;
 
 import 'package:flutter/services.dart';
 import 'package:material_ui/material_ui.dart';
 
 import 'data/models.dart';
+import 'services/kitten_taxon_speech_service.dart';
+import 'services/taxon_speech_service.dart';
 import 'state/taxonomy_controller.dart';
 import 'utils/external_links.dart';
 
@@ -16,10 +19,12 @@ class NcbiTaxonomyApp extends StatelessWidget {
     super.key,
     this.controller,
     this.uriLauncher,
+    this.speechService,
   });
 
   final TaxonomyController? controller;
   final Future<bool> Function(Uri uri)? uriLauncher;
+  final TaxonSpeechService? speechService;
 
   @override
   Widget build(BuildContext context) {
@@ -44,6 +49,7 @@ class NcbiTaxonomyApp extends StatelessWidget {
       home: TaxonomyHomePage(
         controller: controller,
         uriLauncher: uriLauncher,
+        speechService: speechService,
       ),
     );
   }
@@ -54,10 +60,12 @@ class TaxonomyHomePage extends StatefulWidget {
     super.key,
     this.controller,
     this.uriLauncher,
+    this.speechService,
   });
 
   final TaxonomyController? controller;
   final Future<bool> Function(Uri uri)? uriLauncher;
+  final TaxonSpeechService? speechService;
 
   @override
   State<TaxonomyHomePage> createState() => _TaxonomyHomePageState();
@@ -69,6 +77,9 @@ class _TaxonomyHomePageState extends State<TaxonomyHomePage> {
 
   late final TaxonomyController _controller;
   late final bool _ownsController;
+  late final TaxonSpeechService _speechService;
+  late final bool _ownsSpeechService;
+  int? _lastSelectedTaxId;
   final TextEditingController _searchController = TextEditingController();
   final FocusNode _treeFocusNode = FocusNode(debugLabel: 'TaxonomyTree');
   final ScrollController _treeScrollController = ScrollController();
@@ -83,6 +94,9 @@ class _TaxonomyHomePageState extends State<TaxonomyHomePage> {
     super.initState();
     _ownsController = widget.controller == null;
     _controller = widget.controller ?? TaxonomyController();
+    _ownsSpeechService = widget.speechService == null;
+    _speechService = widget.speechService ?? KittenTaxonSpeechService();
+    _lastSelectedTaxId = _controller.selectedTaxId;
     _controller.addListener(_onControllerChanged);
     _controller.init();
   }
@@ -90,6 +104,12 @@ class _TaxonomyHomePageState extends State<TaxonomyHomePage> {
   void _onControllerChanged() {
     if (_controller.query.isEmpty && _searchController.text.isNotEmpty) {
       _searchController.clear();
+    }
+    if (_controller.selectedTaxId != _lastSelectedTaxId) {
+      _lastSelectedTaxId = _controller.selectedTaxId;
+      if (_speechService.isSpeaking || _speechService.isPreparing) {
+        unawaited(_speechService.stop());
+      }
     }
     if (mounted) setState(() {});
   }
@@ -99,6 +119,9 @@ class _TaxonomyHomePageState extends State<TaxonomyHomePage> {
     _controller.removeListener(_onControllerChanged);
     if (_ownsController) {
       _controller.dispose();
+    }
+    if (_ownsSpeechService) {
+      _speechService.dispose();
     }
     _searchController.dispose();
     _treeFocusNode.dispose();
@@ -308,6 +331,16 @@ class _TaxonomyHomePageState extends State<TaxonomyHomePage> {
                                     ),
                                     onPressed: () =>
                                         _askGeminiForTaxon(selected),
+                                  ),
+                                  IconButton(
+                                    tooltip: 'NCBI Taxonomy',
+                                    visualDensity: VisualDensity.compact,
+                                    icon: const Icon(
+                                      Icons.biotech_outlined,
+                                      size: 20,
+                                    ),
+                                    onPressed: () =>
+                                        _openNcbiTaxonomy(selected.taxId),
                                   ),
                                   const SizedBox(width: 4),
                                   FilledButton.tonalIcon(
@@ -643,6 +676,12 @@ class _TaxonomyHomePageState extends State<TaxonomyHomePage> {
                   ),
                 ),
               ),
+              IconButton(
+                tooltip: 'NCBI Taxonomy',
+                visualDensity: VisualDensity.compact,
+                icon: const Icon(Icons.biotech_outlined, size: 18),
+                onPressed: () => _openNcbiTaxonomy(r.taxId),
+              ),
               TextButton.icon(
                 onPressed: () => onSelect(r.taxId),
                 icon: const Icon(Icons.account_tree_outlined, size: 16),
@@ -656,8 +695,41 @@ class _TaxonomyHomePageState extends State<TaxonomyHomePage> {
     );
   }
 
+  Future<void> _toggleSpeakTaxon(String scientificName) async {
+    if ((_speechService.isSpeaking || _speechService.isPreparing) &&
+        _speechService.activeScientificName == scientificName) {
+      await _speechService.stop();
+      return;
+    }
+
+    final ok = await _speechService.speakScientificName(scientificName);
+    if (!ok && mounted) {
+      final reason = _speechService.lastError;
+      if (reason == null || reason.isEmpty) {
+        return;
+      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Could not pronounce "$scientificName": $reason',
+          ),
+        ),
+      );
+    }
+  }
+
   Future<void> _searchGoogleName(String scientificName) async {
     final uri = buildGoogleSearchUri(scientificName);
+    final ok = await openExternalUri(uri, launcher: widget.uriLauncher);
+    if (!ok && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Could not open browser for $uri')),
+      );
+    }
+  }
+
+  Future<void> _openNcbiTaxonomy(int taxId) async {
+    final uri = buildNcbiTaxonomyUri(taxId);
     final ok = await openExternalUri(uri, launcher: widget.uriLauncher);
     if (!ok && mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -1034,17 +1106,81 @@ class _TaxonomyHomePageState extends State<TaxonomyHomePage> {
           ),
           const SizedBox(height: 20),
           Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
             children: [
               Expanded(
-                child: SelectableText(
-                  selected.scientificName,
-                  style: theme.textTheme.headlineMedium?.copyWith(
-                    fontStyle: selected.rank == 'species'
-                        ? FontStyle.italic
-                        : FontStyle.normal,
-                  ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  children: [
+                    Flexible(
+                      child: SelectableText(
+                        selected.scientificName,
+                        style: theme.textTheme.headlineMedium?.copyWith(
+                          fontStyle: selected.rank == 'species'
+                              ? FontStyle.italic
+                              : FontStyle.normal,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 6),
+                    ListenableBuilder(
+                      listenable: _speechService,
+                      builder: (context, _) {
+                        final isActiveForThis =
+                            _speechService.activeScientificName ==
+                                selected.scientificName;
+                        final isPreparingThis =
+                            isActiveForThis && _speechService.isPreparing;
+                        final isSpeakingThis =
+                            isActiveForThis && _speechService.isSpeaking;
+                        final titleFontSize =
+                            theme.textTheme.headlineMedium?.fontSize ?? 28.0;
+                        final idleIconColor =
+                            theme.brightness == Brightness.light
+                                ? Colors.black
+                                : (theme.textTheme.headlineMedium?.color ??
+                                    theme.colorScheme.onSurface);
+                        return IconButton(
+                          tooltip: isPreparingThis
+                              ? (_speechService.statusMessage ??
+                                  'Preparing natural voice...')
+                              : isSpeakingThis
+                                  ? 'Stop pronunciation'
+                                  : 'Pronounce scientific name',
+                          visualDensity: VisualDensity.compact,
+                          padding: EdgeInsets.zero,
+                          iconSize: titleFontSize,
+                          constraints: BoxConstraints.tightFor(
+                            width: titleFontSize + 8,
+                            height: titleFontSize + 8,
+                          ),
+                          icon: isPreparingThis
+                              ? SizedBox(
+                                  width: titleFontSize - 6,
+                                  height: titleFontSize - 6,
+                                  child: CircularProgressIndicator(
+                                    value: _speechService.preparationProgress,
+                                    strokeWidth: 2.5,
+                                  ),
+                                )
+                              : Icon(
+                                  isSpeakingThis
+                                      ? Icons.stop_circle_outlined
+                                      : Icons.volume_up_outlined,
+                                ),
+                          color: isSpeakingThis
+                              ? theme.colorScheme.primary
+                              : idleIconColor,
+                          onPressed: () =>
+                              _toggleSpeakTaxon(selected.scientificName),
+                        );
+                      },
+                    ),
+                  ],
                 ),
               ),
+              const SizedBox(width: 8),
               Chip(label: Text(selected.rank)),
             ],
           ),
@@ -1081,6 +1217,11 @@ class _TaxonomyHomePageState extends State<TaxonomyHomePage> {
                 onPressed: () => _askGeminiForTaxon(selected),
                 icon: const Icon(Icons.auto_awesome, size: 16),
                 label: const Text('Ask Gemini'),
+              ),
+              OutlinedButton.icon(
+                onPressed: () => _openNcbiTaxonomy(selected.taxId),
+                icon: const Icon(Icons.biotech_outlined, size: 16),
+                label: const Text('NCBI Taxonomy'),
               ),
             ],
           ),
