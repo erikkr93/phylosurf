@@ -58,7 +58,7 @@
 ### Phase 5: Release Polish & Documentation
 - [x] **Update `README.md`**: Replaced Flutter template text with PhyloSurf overview, download targets, developer build commands, and release instructions.
 - [x] **CI/CD Release Pipeline**: Added `.github/workflows/ci.yml` (analyze & test) and `.github/workflows/release.yml` (automated Windows, macOS, and Android release builds + SHA256 checksums on `v*` tags).
-- [ ] **Add `LICENSE` & Push to GitHub**: Choose a license, create the GitHub repository, push `main`, and tag `v1.0.0`.
+- [x] **Add `LICENSE` & Push to GitHub**: Added MIT `LICENSE`, pushed `main`, and tagged `v1.0.0`.
 - [ ] **Clean Up Remaining Template Metadata**: Update `pubspec.yaml` package name/description (`ncbi_taxonomy_explorer` -> `phylosurf`) and `CompanyName` / `LegalCopyright` in `windows/runner/Runner.rc`.
 - [ ] **Code Signing (Optional)**: Sign Windows installer/exe, macOS `.app` (notarization), and Android APK with a dedicated release keystore.
 

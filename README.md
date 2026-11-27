@@ -53,3 +53,6 @@ flutter run
    git push origin main --tags
    ```
 3. The `.github/workflows/release.yml` workflow automatically builds Windows, macOS, and Android release artifacts and publishes them to GitHub Releases.
+
+## License
+This project is licensed under the [MIT License](LICENSE).
