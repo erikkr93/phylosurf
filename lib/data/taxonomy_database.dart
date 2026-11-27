@@ -1,4 +1,3 @@
-import 'dart:collection';
 import 'dart:convert';
 import 'dart:io';
 
@@ -730,7 +729,7 @@ class TaxonomyRepository {
     final clean = query.trim();
     if (clean.length < 4) return '';
 
-    final chunks = LinkedHashSet<String>();
+    final chunks = <String>{};
     final words = clean
         .split(RegExp(r'\s+'))
         .where((w) => w.length >= 3)

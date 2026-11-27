@@ -134,8 +134,8 @@ class NcbiSyncService {
       }
 
       final metadata = <String, String>{
-        if (etag != null) 'etag': etag,
-        if (lastModified != null) 'last_modified': lastModified,
+        'etag': ?etag,
+        'last_modified': ?lastModified,
       };
 
       final result = await _runBuildInIsolate(
