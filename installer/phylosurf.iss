@@ -10,7 +10,7 @@
 
 #define MyAppName "PhyloSurf"
 #define MyAppExeName "phylosurf.exe"
-#define MyAppPublisher "PhyloSurf"
+#define MyAppPublisher "Erik Kristiansson"
 
 [Setup]
 AppId={{7E8B6F2A-4D1C-4B9E-A3F5-9C2E8D1A6B40}
